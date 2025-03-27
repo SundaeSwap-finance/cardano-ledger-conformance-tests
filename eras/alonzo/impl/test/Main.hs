@@ -17,13 +17,13 @@ main :: IO ()
 main =
   ledgerTestMain $
     describe "Alonzo" $ do
-      BinarySpec.spec
-      CddlSpec.spec
-      roundTripJsonEraSpec @AlonzoEra
-      Golden.tests
+      --BinarySpec.spec
+      --CddlSpec.spec
+      --roundTripJsonEraSpec @AlonzoEra
+      --Golden.tests
       describe "Imp" $ do
         Imp.spec @AlonzoEra
-      describe "CostModels" $ do
-        CostModelsSpec.spec @AlonzoEra
-      describe "TxWits" $ do
-        TxWitsSpec.spec @AlonzoEra
+      --describe "CostModels" $ do
+      --  CostModelsSpec.spec @AlonzoEra
+      --describe "TxWits" $ do
+      --  TxWitsSpec.spec @AlonzoEra

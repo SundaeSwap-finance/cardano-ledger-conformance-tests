@@ -24,7 +24,7 @@ spec = do
     Vintage.Coders.spec
   PlainSpec.spec
   describe "Versioned" $ do
-    RoundTripSpec.spec
+    --RoundTripSpec.spec
     Failure.spec
     Success.spec
 

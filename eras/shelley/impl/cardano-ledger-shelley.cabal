@@ -163,7 +163,9 @@ library testlib
   build-depends:
     FailT,
     ImpSpec,
+    aeson,
     base,
+    base16-bytestring,
     bytestring,
     cardano-data,
     cardano-ledger-binary:{cardano-ledger-binary, testlib},
@@ -176,6 +178,7 @@ library testlib
     containers,
     cuddle >=0.3.2,
     data-default,
+    directory,
     generic-random,
     hedgehog-quickcheck,
     heredoc,

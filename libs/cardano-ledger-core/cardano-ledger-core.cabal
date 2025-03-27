@@ -208,6 +208,7 @@ library testlib
     hedgehog-quickcheck,
     heredoc,
     hspec,
+    hspec-core,
     mtl,
     nothunks,
     plutus-ledger-api:{plutus-ledger-api, plutus-ledger-api-testlib},

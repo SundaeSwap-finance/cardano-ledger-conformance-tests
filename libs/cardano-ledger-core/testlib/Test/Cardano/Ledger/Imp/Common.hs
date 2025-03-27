@@ -3,6 +3,7 @@
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
 
@@ -75,6 +76,10 @@ module Test.Cardano.Ledger.Imp.Common (
   -- * Re-exports from ImpSpec
   withImpInit,
   modifyImpInit,
+
+  describe,
+  it,
+  globalTestState,
 )
 where
 
@@ -88,6 +93,7 @@ import Test.Cardano.Ledger.Common as X hiding (
   assertColorFailure,
   assertFailure,
   choose,
+  describe,
   elements,
   expectLeft,
   expectLeftDeep,
@@ -102,6 +108,7 @@ import Test.Cardano.Ledger.Common as X hiding (
   expectationFailure,
   frequency,
   growingElements,
+  it,
   listOf,
   listOf1,
   oneof,
@@ -129,6 +136,7 @@ import Test.Cardano.Ledger.Common as X hiding (
   variant,
   vectorOf,
  )
+import qualified Test.Cardano.Ledger.Common as Common
 import Test.Cardano.Ledger.Core.KeyPair (KeyPair (..), mkAddr, mkCredential)
 import Test.ImpSpec (modifyImpInit, withImpInit)
 import Test.ImpSpec.Expectations.Lifted
@@ -145,6 +153,9 @@ import Test.ImpSpec.Random (
 import Test.QuickCheck.GenT as QuickCheckT
 import UnliftIO (MonadUnliftIO (..))
 import UnliftIO.Exception (evaluateDeep)
+import System.IO.Unsafe (unsafePerformIO)
+import Data.IORef (IORef, newIORef, modifyIORef, readIORef)
+import Test.Hspec.Core.Spec as X (getSpecDescriptionPath)
 
 instance MonadUnliftIO m => MonadUnliftIO (GenT m) where
   withRunInIO inner = GenT $ \qc sz ->
@@ -203,3 +214,17 @@ expectNothingExpr (Just x) =
   assertFailure $
     "Expected Nothing, got Just:\n" <> showExpr x
 expectNothingExpr Nothing = pure ()
+
+describe :: String -> SpecWith a -> SpecWith a
+describe s spec = Common.describe s spec
+
+it :: (Example a, MonadIO m, m () ~ a) => String -> a -> SpecWith (Arg a)
+it s spec = do
+  p <- getSpecDescriptionPath
+  Common.it s $ do
+    liftIO $ modifyIORef globalTestState (const (p ++ [s]))
+    spec
+    liftIO $ modifyIORef globalTestState (const [])
+
+globalTestState :: IORef [String]
+globalTestState = unsafePerformIO $ newIORef []
