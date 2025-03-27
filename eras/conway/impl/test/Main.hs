@@ -26,24 +26,24 @@ main :: IO ()
 main =
   ledgerTestMain $
     describe "Conway" $ do
-      Golden.spec
-      Spec.spec
-      Proposals.spec
-      Binary.spec
-      Cddl.spec
-      DRepRatify.spec
-      CommitteeRatify.spec
-      SPORatifySpec.spec
-      Genesis.spec
-      GovActionReorder.spec
-      roundTripJsonEraSpec @Conway
+      --Golden.spec
+      --Spec.spec
+      --Proposals.spec
+      --Binary.spec
+      --Cddl.spec
+      --DRepRatify.spec
+      --CommitteeRatify.spec
+      --SPORatifySpec.spec
+      --Genesis.spec
+      --GovActionReorder.spec
+      --roundTripJsonEraSpec @Conway
       describe "Imp" $
         Imp.spec @Conway
-      describe "CostModels" $ do
-        CostModelsSpec.spec @Conway
-      describe "TxWits" $ do
-        TxWitsSpec.spec @Conway
-      describe "Plutus" $ do
-        PlutusSpec.spec
-      Regression.spec @Conway
-      TxInfo.spec
+      --describe "CostModels" $ do
+      --  CostModelsSpec.spec @Conway
+      --describe "TxWits" $ do
+      --  TxWitsSpec.spec @Conway
+      --describe "Plutus" $ do
+      --  PlutusSpec.spec
+      --Regression.spec @Conway
+      --TxInfo.spec

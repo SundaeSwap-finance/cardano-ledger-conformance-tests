@@ -13,7 +13,7 @@ main :: IO ()
 main =
   ledgerTestMain $
     describe "Allegra" $ do
-      BinarySpec.spec
-      CddlSpec.spec
+      --BinarySpec.spec
+      --CddlSpec.spec
       describe "Imp" $ do
         Imp.spec @Allegra

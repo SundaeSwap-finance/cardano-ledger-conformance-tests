@@ -14,8 +14,8 @@ main :: IO ()
 main =
   ledgerTestMain $
     describe "Mary" $ do
-      ValueSpec.spec
-      BinarySpec.spec
-      CddlSpec.spec
+      --ValueSpec.spec
+      --BinarySpec.spec
+      --CddlSpec.spec
       describe "Imp" $ do
         Imp.spec @Mary

@@ -145,6 +145,7 @@ import Cardano.Ledger.AuxiliaryData (AuxiliaryDataHash (..))
 import Cardano.Ledger.BHeaderView (BHeaderView)
 import Cardano.Ledger.BaseTypes
 import Cardano.Ledger.Binary (DecCBOR, EncCBOR)
+import Cardano.Ledger.Binary.Encoding (serialize)
 import Cardano.Ledger.Block (Block)
 import Cardano.Ledger.CertState (certDStateL, dsUnifiedL)
 import Cardano.Ledger.Coin (Coin (..))
@@ -241,13 +242,18 @@ import Control.State.Transition.Extended (
   SingEP (..),
   ValidationPolicy (..),
  )
+import qualified Data.Aeson as Aeson
 import Data.Bifunctor (first)
+import qualified Data.ByteString as BS
+import qualified Data.ByteString.Base16 as B16
 import Data.Coerce (coerce)
 import Data.Data (Proxy (..), type (:~:) (..))
 import Data.Default (Default (..))
+import qualified Data.Either as Either
 import Data.Foldable (toList, traverse_)
 import Data.Functor (($>))
 import Data.Functor.Identity (Identity (..))
+import Data.List (intercalate)
 import Data.List.NonEmpty (NonEmpty)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
@@ -256,6 +262,7 @@ import Data.Sequence.Strict (StrictSeq (..))
 import qualified Data.Sequence.Strict as SSeq
 import qualified Data.Set as Set
 import qualified Data.Text as T
+import qualified Data.Text.Encoding as TE
 import Data.Time.Format.ISO8601 (iso8601ParseM)
 import Data.TreeDiff (ansiWlExpr)
 import Data.Type.Equality (TestEquality (..))
@@ -266,7 +273,9 @@ import Lens.Micro.Mtl (use, view, (%=), (+=), (.=))
 import Numeric.Natural (Natural)
 import Prettyprinter (Doc)
 import Prettyprinter.Render.Terminal (AnsiStyle)
+import qualified System.Directory as Directory
 import qualified System.Random.Stateful as R
+--import System.IO.Unsafe (unsafePerformIO)
 import Test.Cardano.Ledger.Binary.RoundTrip (roundTripCborRangeFailureExpectation)
 import Test.Cardano.Ledger.Core.Arbitrary ()
 import Test.Cardano.Ledger.Core.Binary.RoundTrip (roundTripEraExpectation)
@@ -285,6 +294,8 @@ import Test.Cardano.Slotting.Numeric ()
 import Test.ImpSpec
 import Type.Reflection (Typeable, typeOf)
 import UnliftIO (evaluateDeep)
+
+import Data.IORef (readIORef)
 
 type ImpTestM era = ImpM (LedgerSpec era)
 
@@ -1070,9 +1081,27 @@ trySubmitTx ::
   Tx era ->
   ImpTestM era (Either (NonEmpty (PredicateFailure (EraRule "LEDGER" era)), Tx era) (Tx era))
 trySubmitTx tx = do
+  protVer <- getProtVer
   txFixed <- asks iteFixup >>= ($ tx)
   logToExpr txFixed
+  -- Log the tx post-fixup
+  let txCbor = B16.encode $ BS.toStrict $ (serialize (pvMajor protVer) txFixed)
   st <- gets impNES
+  -- Log the ledger state
+  liftIO $ do
+    testState <- readIORef globalTestState
+    let ls = Aeson.toJSON (st ^. nesEsL . esLStateL)
+    let dir = intercalate "." testState
+    let o =
+          Aeson.object $
+            [ ("cbor", Aeson.String $ Either.fromRight undefined $ TE.decodeUtf8' txCbor)
+            , ("ledgerState", ls)
+            , ("testState", Aeson.String $ T.pack dir)
+            ]
+    Directory.createDirectoryIfMissing False "dump"
+    Directory.createDirectoryIfMissing False ("dump/" ++ dir)
+    ix <- fmap length (Directory.listDirectory ("dump/" ++ dir))
+    BS.writeFile ("dump/" ++ dir ++ "/" ++ show ix) (BS.toStrict (Aeson.encode o))
   lEnv <- impLedgerEnv st
   ImpTestState {impRootTxIn} <- get
   res <- tryRunImpRule @"LEDGER" lEnv (st ^. nesEsL . esLStateL) txFixed
