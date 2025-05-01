@@ -79,6 +79,8 @@ module Cardano.Ledger.Core.PParams (
 )
 where
 
+import qualified Data.ByteString as ByteString
+import Data.ByteString (ByteString)
 import Cardano.Ledger.BaseTypes (
   EpochInterval (..),
   NonNegativeInterval,
@@ -87,7 +89,7 @@ import Cardano.Ledger.BaseTypes (
   StrictMaybe (..),
   UnitInterval,
  )
-import Cardano.Ledger.Binary (DecCBOR, EncCBOR, FromCBOR, ToCBOR)
+import Cardano.Ledger.Binary (DecCBOR, EncCBOR, Encoding, FromCBOR, Version, ToCBOR, encodeNull)
 import Cardano.Ledger.Coin (Coin (..))
 import Cardano.Ledger.Core.Era (Era (..), PreviousEra, ProtVerAtMost)
 import Cardano.Ledger.HKD (HKD, HKDApplicative, HKDFunctor (..), NoUpdate (..))
@@ -256,6 +258,11 @@ class
   where
   -- | Protocol parameters where the fields are represented with a HKD
   type PParamsHKD (f :: Type -> Type) era = (r :: Type) | r -> era
+
+  hashPParams :: PParams era -> Version -> ByteString
+  hashPParams _ _ = ByteString.empty
+  encodePParamsPreimage :: PParams era -> Encoding
+  encodePParamsPreimage _ = encodeNull
 
   -- | Applies a protocol parameters update
   applyPPUpdates ::

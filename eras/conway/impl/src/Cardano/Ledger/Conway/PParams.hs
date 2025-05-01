@@ -73,6 +73,8 @@ module Cardano.Ledger.Conway.PParams (
 )
 where
 
+import Cardano.Crypto.Hash.Class (digest)
+import Cardano.Crypto.Hash.SHA256 (SHA256)
 import Cardano.Ledger.Alonzo.PParams (AlonzoEraPParams (..), OrdExUnits (..))
 import Cardano.Ledger.Alonzo.Scripts (
   CostModels,
@@ -96,8 +98,12 @@ import Cardano.Ledger.Binary (
   EncCBOR (..),
   Encoding,
   FromCBOR (..),
+  Version (..),
   ToCBOR (..),
   encodeListLen,
+  encodeBytes,
+  toBuilder,
+  withCurrentEncodingVersion,
  )
 import Cardano.Ledger.Binary.Coders
 import Cardano.Ledger.Coin (Coin (Coin))
@@ -124,6 +130,10 @@ import Cardano.Ledger.Val (Val (..))
 import Control.DeepSeq (NFData (..), rwhnf)
 import Data.Aeson hiding (Encoding, Value, decode, encode)
 import qualified Data.Aeson as Aeson
+import qualified Data.Aeson.Encoding as Encoding
+import qualified Data.ByteString as ByteString
+import qualified Data.ByteString.Base16 as Base16
+import qualified Data.ByteString.Builder as Builder
 import Data.Default (Default (def))
 import Data.Functor.Identity (Identity)
 import qualified Data.Map.Strict as Map
@@ -131,6 +141,7 @@ import Data.Maybe.Strict (StrictMaybe (..), isSNothing)
 import Data.Proxy
 import Data.Set (Set)
 import qualified Data.Set as Set
+import qualified Data.Text.Encoding as TE
 import Data.Typeable
 import Data.Word (Word16, Word32)
 import GHC.Generics (Generic)
@@ -718,6 +729,10 @@ instance Crypto c => EraPParams (ConwayEra c) where
   hkdMinUTxOValueL = notSupportedInThisEraL
 
 instance Crypto c => AlonzoEraPParams (ConwayEra c) where
+  hashPParams (PParams p) = hashConwayPParams p
+  encodePParamsPreimage (PParams p) = encodePParamsPreimageConway p
+
+instance AlonzoEraPParams ConwayEra where
   hkdCoinsPerUTxOWordL = notSupportedInThisEraL
   hkdCostModelsL = lens (unTHKD . cppCostModels) $ \pp x -> pp {cppCostModels = THKD x}
   hkdPricesL = lens (unTHKD . cppPrices) $ \pp x -> pp {cppPrices = THKD x}
@@ -798,42 +813,57 @@ instance Crypto c => ConwayEraPParams (ConwayEra c) where
   hkdMinFeeRefScriptCostPerByteL =
     lens (unTHKD . cppMinFeeRefScriptCostPerByte) $ \pp x -> pp {cppMinFeeRefScriptCostPerByte = THKD x}
 
+encodePParamsPreimageConway :: ConwayPParams Identity era -> Encoding
+encodePParamsPreimageConway ConwayPParams {..} =
+        encode $
+          Rec (ConwayPParams @Identity)
+            !> To cppMinFeeA
+            !> To cppMinFeeB
+            !> To cppMaxBBSize
+            !> To cppMaxTxSize
+            !> To cppMaxBHSize
+            !> To cppKeyDeposit
+            !> To cppPoolDeposit
+            !> To cppEMax
+            !> To cppNOpt
+            !> To cppA0
+            !> To cppRho
+            !> To cppTau
+            !> To cppProtocolVersion
+            !> To cppMinPoolCost
+            !> To cppCoinsPerUTxOByte
+            !> To cppCostModels
+            !> To cppPrices
+            !> To cppMaxTxExUnits
+            !> To cppMaxBlockExUnits
+            !> To cppMaxValSize
+            !> To cppCollateralPercentage
+            !> To cppMaxCollateralInputs
+            -- New for Conway
+            !> To cppPoolVotingThresholds
+            !> To cppDRepVotingThresholds
+            !> To cppCommitteeMinSize
+            !> To cppCommitteeMaxTermLength
+            !> To cppGovActionLifetime
+            !> To cppGovActionDeposit
+            !> To cppDRepDeposit
+            !> To cppDRepActivity
+            !> To cppMinFeeRefScriptCostPerByte
+
+hashConwayPParams :: ConwayPParams Identity era -> Version -> ByteString.ByteString
+hashConwayPParams p v =
+  let
+    bytesBuilder = toBuilder v (encodePParamsPreimageConway p)
+    contentHash =
+      digest
+        (Proxy @SHA256)
+        (ByteString.toStrict (Builder.toLazyByteString bytesBuilder))
+  in
+    contentHash
+
 instance Era era => EncCBOR (ConwayPParams Identity era) where
-  encCBOR ConwayPParams {..} =
-    encode $
-      Rec (ConwayPParams @Identity)
-        !> To cppMinFeeA
-        !> To cppMinFeeB
-        !> To cppMaxBBSize
-        !> To cppMaxTxSize
-        !> To cppMaxBHSize
-        !> To cppKeyDeposit
-        !> To cppPoolDeposit
-        !> To cppEMax
-        !> To cppNOpt
-        !> To cppA0
-        !> To cppRho
-        !> To cppTau
-        !> To cppProtocolVersion
-        !> To cppMinPoolCost
-        !> To cppCoinsPerUTxOByte
-        !> To cppCostModels
-        !> To cppPrices
-        !> To cppMaxTxExUnits
-        !> To cppMaxBlockExUnits
-        !> To cppMaxValSize
-        !> To cppCollateralPercentage
-        !> To cppMaxCollateralInputs
-        -- New for Conway
-        !> To cppPoolVotingThresholds
-        !> To cppDRepVotingThresholds
-        !> To cppCommitteeMinSize
-        !> To cppCommitteeMaxTermLength
-        !> To cppGovActionLifetime
-        !> To cppGovActionDeposit
-        !> To cppDRepDeposit
-        !> To cppDRepActivity
-        !> To cppMinFeeRefScriptCostPerByte
+  encCBOR pparams =
+    withCurrentEncodingVersion (\v -> encodeBytes (hashConwayPParams pparams v))
 
 instance Era era => ToCBOR (ConwayPParams Identity era) where
   toCBOR = toEraCBOR @era
@@ -881,6 +911,22 @@ instance Era era => FromCBOR (ConwayPParams Identity era) where
 instance Crypto c => ToJSON (ConwayPParams Identity (ConwayEra c)) where
   toJSON = object . conwayPParamsPairs
   toEncoding = pairs . mconcat . conwayPParamsPairs
+instance ToJSON (ConwayPParams Identity ConwayEra) where
+  toJSON x =
+    let
+      bytes = Aeson.encode (object (conwayPParamsPairs x))
+      contentHash = digest (Proxy @SHA256) (ByteString.toStrict bytes)
+      hashHex = Base16.encode contentHash
+    in
+      String (TE.decodeUtf8Lenient hashHex)
+  toEncoding x =
+    let
+      enc = pairs (mconcat (conwayPParamsPairs x))
+      bytes = Encoding.encodingToLazyByteString enc
+      contentHash = digest (Proxy @SHA256) (ByteString.toStrict bytes)
+      hashHex = Base16.encode contentHash
+    in
+      Encoding.text (TE.decodeUtf8Lenient hashHex)
 
 conwayPParamsPairs ::
   forall era a e.
