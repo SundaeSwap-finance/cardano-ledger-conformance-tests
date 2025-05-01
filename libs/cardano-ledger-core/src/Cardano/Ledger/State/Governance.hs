@@ -76,6 +76,9 @@ class
   -- | Lens for accessing the previous protocol parameters
   prevPParamsGovStateL :: Lens' (GovState era) (PParams era)
 
+  curPParamsGovStatePulsing :: GovState era -> Maybe (PParams era)
+  prevPParamsGovStatePulsing :: GovState era -> Maybe (PParams era)
+
   -- | Lens for accessing the future protocol parameters.
   --
   -- This lens will produce `DefinitePParamsUpdate` whenever we are absolutely sure that

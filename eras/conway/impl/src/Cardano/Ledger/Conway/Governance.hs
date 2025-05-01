@@ -418,6 +418,9 @@ instance EraPParams ConwayEra => EraGov ConwayEra where
 
   prevPParamsGovStateL = cgsPrevPParamsL
 
+  curPParamsGovStatePulsing = Just . ensCurPParams . rsEnactState . extractDRepPulsingState . cgsDRepPulsingState
+  prevPParamsGovStatePulsing = Just . ensPrevPParams . rsEnactState . extractDRepPulsingState . cgsDRepPulsingState
+
   futurePParamsGovStateL = cgsFuturePParamsL
 
   obligationGovState st =

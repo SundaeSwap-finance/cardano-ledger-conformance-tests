@@ -151,6 +151,7 @@ import Cardano.Ledger.Binary.Encoding (serialize)
 import Cardano.Ledger.Block (Block)
 import Cardano.Ledger.CertState (EraCertState (..), dsUnifiedL)
 import Cardano.Ledger.Coin
+import Cardano.Ledger.Core
 import Cardano.Ledger.Credential (Credential (..), Ptr, StakeReference (..), credToText)
 import Cardano.Ledger.Genesis (EraGenesis (..), NoGenesis (..))
 import Cardano.Ledger.Keys (
@@ -189,6 +190,7 @@ import Cardano.Ledger.Shelley.LedgerState (
   prevPParamsEpochStateL,
   produced,
   utxosDonationL,
+  utxosGovStateL,
  )
 import Cardano.Ledger.Shelley.Rules (
   BbodyEnv (..),
@@ -1092,21 +1094,7 @@ trySubmitTx tx = do
   -- Log the tx post-fixup
   let txCbor = B16.encode $ BS.toStrict $ (serialize (pvMajor protVer) txFixed)
   st <- gets impNES
-  -- Log the ledger state
-  liftIO $ do
-    testState <- readIORef globalTestState
-    let ls = Aeson.toJSON (st ^. nesEsL . esLStateL)
-    let dir = intercalate "." testState
-    let o =
-          Aeson.object $
-            [ ("cbor", Aeson.String $ Either.fromRight undefined $ TE.decodeUtf8' txCbor)
-            , ("ledgerState", ls)
-            , ("testState", Aeson.String $ T.pack dir)
-            ]
-    Directory.createDirectoryIfMissing False "dump"
-    Directory.createDirectoryIfMissing False ("dump/" ++ dir)
-    ix <- fmap length (Directory.listDirectory ("dump/" ++ dir))
-    BS.writeFile ("dump/" ++ dir ++ "/" ++ show ix) (BS.toStrict (Aeson.encode o))
+  let oldLedgerState = st ^. nesEsL . esLStateL
   lEnv <- impLedgerEnv st
   ImpTestState {impRootTxIn} <- get
   res <- tryRunImpRule @"LEDGER" lEnv (st ^. nesEsL . esLStateL) txFixed
@@ -1122,7 +1110,7 @@ trySubmitTx tx = do
     >>= (\f -> f globals res lEnv (st ^. nesEsL . esLStateL) txFixed)
 #endif
 
-  case res of
+  res' <- case res of
     Left predFailures -> do
       -- Verify that produced predicate failures are ready for the node-to-client protocol
       if roundTripCheck
@@ -1154,6 +1142,48 @@ trySubmitTx tx = do
       impRootTxInL .= newRoot
       expectTxSuccess txFixed
       pure $ Right txFixed
+  -- Log the ledger state
+  st' <- gets impNES
+  let newLedgerState = st' ^. nesEsL . esLStateL
+  liftIO $ do
+    testState <- readIORef globalTestState
+    let dir = intercalate "." testState
+    let success = case res' of { Right _ -> True; Left _ -> False }
+    let cborHexLedgerState ls = B16.encode $ BS.toStrict $ (serialize (pvMajor protVer) ls)
+    let newLs = cborHexLedgerState newLedgerState
+    let oldLs = cborHexLedgerState oldLedgerState
+    let aesonBS = Aeson.String . Either.fromRight undefined . TE.decodeUtf8'
+    let o =
+          Aeson.object $
+            (if success then (("newLedgerState" :: Aeson.Key, aesonBS newLs) :) else id) $
+            [ ("cbor", aesonBS txCbor)
+            , ("testState", Aeson.String $ T.pack dir)
+            , ("success", Aeson.Bool success)
+            , ("oldLedgerState", aesonBS oldLs)
+            ]
+    Directory.createDirectoryIfMissing False "dump"
+    Directory.createDirectoryIfMissing False ("dump/" ++ dir)
+    ix <- fmap length (Directory.listDirectory ("dump/" ++ dir))
+    BS.writeFile ("dump/" ++ dir ++ "/" ++ show ix) (BS.toStrict (Aeson.encode o))
+    let
+      newGovState = newLedgerState ^. lsUTxOStateL . utxosGovStateL
+      oldGovState = oldLedgerState ^. lsUTxOStateL . utxosGovStateL
+      getPParamsGovState govState = catMaybes
+        [ Just (govState ^. curPParamsGovStateL)
+        , Just (govState ^. prevPParamsGovStateL)
+        , curPParamsGovStatePulsing govState
+        , prevPParamsGovStatePulsing govState
+        ]
+      allPParams = getPParamsGovState newGovState ++ getPParamsGovState oldGovState
+    Directory.createDirectoryIfMissing False "dump/pparams-by-hash"
+    traverse_
+      (\pparams -> do
+        let hash = hashPParams pparams (pvMajor protVer)
+        BS.writeFile
+          ("dump/pparams-by-hash/" ++ T.unpack (Either.fromRight undefined (TE.decodeUtf8' (B16.encode hash))))
+          (BS.toStrict (serialize (pvMajor protVer) (encodePParamsPreimage pparams))))
+      allPParams
+    pure res'
 {- FOURMOLU_ENABLE -}
 
 -- | Submit a transaction that is expected to be rejected with the given predicate failures.

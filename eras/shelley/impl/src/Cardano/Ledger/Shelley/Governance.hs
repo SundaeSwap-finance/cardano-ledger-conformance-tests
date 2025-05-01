@@ -63,6 +63,9 @@ instance EraGov ShelleyEra where
 
   prevPParamsGovStateL = prevPParamsShelleyGovStateL
 
+  curPParamsGovStatePulsing _ = Nothing
+  prevPParamsGovStatePulsing _ = Nothing
+
   futurePParamsGovStateL = futurePParamsShelleyGovStateL
 
   obligationGovState = const mempty -- No GovState obigations in ShelleyEra
