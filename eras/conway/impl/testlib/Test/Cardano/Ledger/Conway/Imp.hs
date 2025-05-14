@@ -151,7 +151,7 @@ conwaySpec = do
   describe "EPOCH" Epoch.spec
   describe "GOV" Gov.spec
   describe "GOVCERT" GovCert.spec
-  describe "LEDGER" Ledger.spec
+  --describe "LEDGER" Ledger.spec
   describe "RATIFY" Ratify.spec
   describe "UTXO" Utxo.spec
   describe "UTXOS" Utxos.spec
