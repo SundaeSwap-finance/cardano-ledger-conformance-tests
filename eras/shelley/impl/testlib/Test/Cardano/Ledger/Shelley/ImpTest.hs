@@ -1134,7 +1134,8 @@ trySubmitTx tx = do
   let newLedgerState = st' ^. nesEsL . esLStateL
   liftIO $ do
     testState <- readIORef globalTestState
-    let dir = intercalate "." testState
+    let sanitize = map $ \c -> if c == '/' then '-' else c
+    let dir = sanitize $ intercalate "." testState
     let success = case res' of { Right _ -> True; Left _ -> False }
     let cborHexLedgerState ls = B16.encode $ BS.toStrict $ (serialize (pvMajor protVer) ls)
     let newLs = cborHexLedgerState newLedgerState
