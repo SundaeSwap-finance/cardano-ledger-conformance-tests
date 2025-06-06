@@ -106,7 +106,9 @@ library
         small-steps >=1.1,
         text,
         transformers,
-        validation-selective
+        validation-selective,
+        base16-bytestring,
+        bytestring,
 
     if flag(asserts)
         ghc-options: -fno-ignore-asserts

@@ -732,7 +732,6 @@ instance Crypto c => AlonzoEraPParams (ConwayEra c) where
   hashPParams (PParams p) = hashConwayPParams p
   encodePParamsPreimage (PParams p) = encodePParamsPreimageConway p
 
-instance AlonzoEraPParams ConwayEra where
   hkdCoinsPerUTxOWordL = notSupportedInThisEraL
   hkdCostModelsL = lens (unTHKD . cppCostModels) $ \pp x -> pp {cppCostModels = THKD x}
   hkdPricesL = lens (unTHKD . cppPrices) $ \pp x -> pp {cppPrices = THKD x}

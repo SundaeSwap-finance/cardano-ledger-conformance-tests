@@ -88,11 +88,11 @@ spec = describe "Valid transactions" $ do
         it "Not validating MINT script" $ do
           expectTxSuccess <=< submitPhase2Invalid <=< mkTokenMintingTx $ alwaysFailsNoDatumHash
 
-  it "Validating scripts everywhere" $ do
-    const $ pendingWith "not implemented yet"
-  it "Acceptable supplimentary datum" $ do
-    const $ pendingWith "not implemented yet"
-  it "Multiple identical certificates" $ do
-    const $ pendingWith "not implemented yet"
-  it "Non-script output with datum" $ do
-    const $ pendingWith "not implemented yet"
+  --it "Validating scripts everywhere" $ do
+  --  const $ pendingWith "not implemented yet"
+  --it "Acceptable supplimentary datum" $ do
+  --  const $ pendingWith "not implemented yet"
+  --it "Multiple identical certificates" $ do
+  --  const $ pendingWith "not implemented yet"
+  --it "Non-script output with datum" $ do
+  --  const $ pendingWith "not implemented yet"
