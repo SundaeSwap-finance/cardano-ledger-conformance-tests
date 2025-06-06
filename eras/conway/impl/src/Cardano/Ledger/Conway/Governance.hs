@@ -399,9 +399,6 @@ instance EraPParams (ConwayEra c) => EraGov (ConwayEra c) where
 
   prevPParamsGovStateL = cgsPrevPParamsL
 
-  curPParamsGovStatePulsing = Just . ensCurPParams . rsEnactState . extractDRepPulsingState . cgsDRepPulsingState
-  prevPParamsGovStatePulsing = Just . ensPrevPParams . rsEnactState . extractDRepPulsingState . cgsDRepPulsingState
-
   futurePParamsGovStateL = cgsFuturePParamsL
 
   obligationGovState st =

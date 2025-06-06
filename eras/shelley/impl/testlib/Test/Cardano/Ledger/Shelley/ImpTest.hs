@@ -150,6 +150,7 @@ import Cardano.Ledger.Block (Block)
 import Cardano.Ledger.CertState (dsUnifiedL)
 import Cardano.Ledger.Coin
 import Cardano.Ledger.Core
+import Cardano.Ledger.Crypto (Crypto (..))
 import Cardano.Ledger.Credential (Credential (..), Ptr, StakeReference (..), credToText)
 import Cardano.Ledger.Genesis (EraGenesis (..), NoGenesis (..))
 import Cardano.Ledger.Keys (
@@ -1159,8 +1160,6 @@ trySubmitTx tx = do
       getPParamsGovState govState = catMaybes
         [ Just (govState ^. curPParamsGovStateL)
         , Just (govState ^. prevPParamsGovStateL)
-        , curPParamsGovStatePulsing govState
-        , prevPParamsGovStatePulsing govState
         ]
       allPParams = getPParamsGovState newGovState ++ getPParamsGovState oldGovState
     Directory.createDirectoryIfMissing False "dump/pparams-by-hash"
