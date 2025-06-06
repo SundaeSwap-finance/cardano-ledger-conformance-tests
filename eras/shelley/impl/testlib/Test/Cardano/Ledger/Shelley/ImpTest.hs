@@ -1088,7 +1088,7 @@ trySubmitTx tx = do
   -- Log the tx post-fixup
   let txCbor = B16.encode $ BS.toStrict $ (serialize (pvMajor protVer) txFixed)
   st <- gets impNES
-  let oldLedgerState = st ^. nesEsL . esLStateL
+  let oldEpochState = st ^. nesEsL
   lEnv <- impLedgerEnv st
   ImpTestState {impRootTxIn} <- get
   res <- tryRunImpRule @"LEDGER" lEnv (st ^. nesEsL . esLStateL) txFixed
@@ -1131,31 +1131,31 @@ trySubmitTx tx = do
       pure $ Right txFixed
   -- Log the ledger state
   st' <- gets impNES
-  let newLedgerState = st' ^. nesEsL . esLStateL
+  let newEpochState = st' ^. nesEsL
   liftIO $ do
     testState <- readIORef globalTestState
     let sanitize = map $ \c -> if c == '/' then '-' else c
     let dir = sanitize $ intercalate "." testState
     let success = case res' of { Right _ -> True; Left _ -> False }
     let cborHexLedgerState ls = B16.encode $ BS.toStrict $ (serialize (pvMajor protVer) ls)
-    let newLs = cborHexLedgerState newLedgerState
-    let oldLs = cborHexLedgerState oldLedgerState
+    let newEs = cborHexLedgerState newEpochState
+    let oldEs = cborHexLedgerState oldEpochState
     let aesonBS = Aeson.String . Either.fromRight undefined . TE.decodeUtf8'
     let o =
           Aeson.object $
-            (if success then (("newLedgerState" :: Aeson.Key, aesonBS newLs) :) else id) $
+            (if success then (("newEpochState" :: Aeson.Key, aesonBS newEs) :) else id) $
             [ ("cbor", aesonBS txCbor)
             , ("testState", Aeson.String $ T.pack dir)
             , ("success", Aeson.Bool success)
-            , ("oldLedgerState", aesonBS oldLs)
+            , ("oldEpochState", aesonBS oldEs)
             ]
     Directory.createDirectoryIfMissing False "dump"
     Directory.createDirectoryIfMissing False ("dump/" ++ dir)
     ix <- fmap length (Directory.listDirectory ("dump/" ++ dir))
     BS.writeFile ("dump/" ++ dir ++ "/" ++ show ix) (BS.toStrict (Aeson.encode o))
     let
-      newGovState = newLedgerState ^. lsUTxOStateL . utxosGovStateL
-      oldGovState = oldLedgerState ^. lsUTxOStateL . utxosGovStateL
+      newGovState = newEpochState ^. esLStateL . lsUTxOStateL . utxosGovStateL
+      oldGovState = oldEpochState ^. esLStateL . lsUTxOStateL . utxosGovStateL
       getPParamsGovState govState = catMaybes
         [ Just (govState ^. curPParamsGovStateL)
         , Just (govState ^. prevPParamsGovStateL)
