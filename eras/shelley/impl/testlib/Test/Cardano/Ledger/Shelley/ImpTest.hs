@@ -150,6 +150,7 @@ import Cardano.Ledger.Block (Block)
 import Cardano.Ledger.CertState (dsUnifiedL)
 import Cardano.Ledger.Coin
 import Cardano.Ledger.Core
+import Cardano.Ledger.CertState (certDStateL, dsUnifiedL)
 import Cardano.Ledger.Crypto (Crypto (..))
 import Cardano.Ledger.Credential (Credential (..), Ptr, StakeReference (..), credToText)
 import Cardano.Ledger.Genesis (EraGenesis (..), NoGenesis (..))
