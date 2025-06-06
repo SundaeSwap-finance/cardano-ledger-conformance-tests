@@ -114,9 +114,6 @@ instance Crypto c => EraGov (ShelleyEra c) where
 
   prevPParamsGovStateL = prevPParamsShelleyGovStateL
 
-  curPParamsGovStatePulsing _ = Nothing
-  prevPParamsGovStatePulsing _ = Nothing
-
   futurePParamsGovStateL = futurePParamsShelleyGovStateL
 
   obligationGovState = const mempty -- No GovState obigations in ShelleyEra

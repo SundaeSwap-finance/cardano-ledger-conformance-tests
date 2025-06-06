@@ -131,7 +131,7 @@ import Test.Cardano.Ledger.Common as X hiding (
   vectorOf,
  )
 import qualified Test.Cardano.Ledger.Common as Common
-import Test.Cardano.Ledger.Core.KeyPair (KeyPair (..), mkAddr, mkCredential)
+import Test.Cardano.Ledger.Core.KeyPair (KeyPair (..), mkAddr)
 import Test.ImpSpec (modifyImpInit, withImpInit)
 import Test.ImpSpec.Expectations.Lifted
 import Test.ImpSpec.Random (

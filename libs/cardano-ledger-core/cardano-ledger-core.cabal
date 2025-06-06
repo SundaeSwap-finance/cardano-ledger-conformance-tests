@@ -186,6 +186,7 @@ library testlib
         generic-random,
         genvalidity,
         hspec,
+        hspec-core,
         hedgehog-quickcheck,
         here,
         ImpSpec,

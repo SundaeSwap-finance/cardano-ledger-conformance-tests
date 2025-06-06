@@ -51,9 +51,6 @@ instance Crypto c => EraGov (AllegraEra c) where
 
   prevPParamsGovStateL = prevPParamsShelleyGovStateL
 
-  curPParamsGovStatePulsing _ = Nothing
-  prevPParamsGovStatePulsing _ = Nothing
-
   futurePParamsGovStateL = futurePParamsShelleyGovStateL
 
   obligationGovState = const mempty

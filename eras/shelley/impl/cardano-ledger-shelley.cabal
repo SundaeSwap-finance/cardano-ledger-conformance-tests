@@ -179,7 +179,10 @@ library testlib
         microlens-mtl,
         mtl,
         unliftio,
-        vector-map
+        vector-map,
+        aeson,
+        base16-bytestring,
+        directory,
 
 executable huddle-cddl
     main-is:          Main.hs
