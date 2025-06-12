@@ -728,10 +728,10 @@ instance Crypto c => EraPParams (ConwayEra c) where
   hkdExtraEntropyL = notSupportedInThisEraL
   hkdMinUTxOValueL = notSupportedInThisEraL
 
-instance Crypto c => AlonzoEraPParams (ConwayEra c) where
   hashPParams (PParams p) = hashConwayPParams p
   encodePParamsPreimage (PParams p) = encodePParamsPreimageConway p
 
+instance Crypto c => AlonzoEraPParams (ConwayEra c) where
   hkdCoinsPerUTxOWordL = notSupportedInThisEraL
   hkdCostModelsL = lens (unTHKD . cppCostModels) $ \pp x -> pp {cppCostModels = THKD x}
   hkdPricesL = lens (unTHKD . cppPrices) $ \pp x -> pp {cppPrices = THKD x}
@@ -908,9 +908,6 @@ instance Era era => FromCBOR (ConwayPParams Identity era) where
   fromCBOR = fromEraCBOR @era
 
 instance Crypto c => ToJSON (ConwayPParams Identity (ConwayEra c)) where
-  toJSON = object . conwayPParamsPairs
-  toEncoding = pairs . mconcat . conwayPParamsPairs
-instance ToJSON (ConwayPParams Identity ConwayEra) where
   toJSON x =
     let
       bytes = Aeson.encode (object (conwayPParamsPairs x))

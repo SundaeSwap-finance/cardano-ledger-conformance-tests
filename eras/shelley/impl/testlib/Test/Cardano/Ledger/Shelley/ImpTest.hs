@@ -485,6 +485,7 @@ class
   , DSIGNAlgorithm (DSIGN (EraCrypto era))
   , Signable (DSIGN (EraCrypto era)) (Hash (EraCrypto era) EraIndependentTxBody)
   , ADDRHASH (EraCrypto era) ~ Blake2b_224
+  , EncCBOR (StashedAVVMAddresses era)
   ) =>
   ShelleyEraImp era
   where
@@ -1090,7 +1091,7 @@ trySubmitTx tx = do
   -- Log the tx post-fixup
   let txCbor = B16.encode $ BS.toStrict $ (serialize (pvMajor protVer) txFixed)
   st <- gets impNES
-  let oldEpochState = st ^. nesEsL
+  let oldNES = st
   lEnv <- impLedgerEnv st
   ImpTestState {impRootTxIn} <- get
   res <- tryRunImpRule @"LEDGER" lEnv (st ^. nesEsL . esLStateL) txFixed
@@ -1133,31 +1134,31 @@ trySubmitTx tx = do
       pure $ Right txFixed
   -- Log the ledger state
   st' <- gets impNES
-  let newEpochState = st' ^. nesEsL
+  let newNES = st'
   liftIO $ do
     testState <- readIORef globalTestState
     let sanitize = map $ \c -> if c == '/' then '-' else c
     let dir = sanitize $ intercalate "." testState
     let success = case res' of { Right _ -> True; Left _ -> False }
     let cborHexLedgerState ls = B16.encode $ BS.toStrict $ (serialize (pvMajor protVer) ls)
-    let newEs = cborHexLedgerState newEpochState
-    let oldEs = cborHexLedgerState oldEpochState
+    let newNESCbor = cborHexLedgerState newNES
+    let oldNESCbor = cborHexLedgerState oldNES
     let aesonBS = Aeson.String . Either.fromRight undefined . TE.decodeUtf8'
     let o =
           Aeson.object $
-            (if success then (("newEpochState" :: Aeson.Key, aesonBS newEs) :) else id) $
+            (if success then (("newNES" :: Aeson.Key, aesonBS newNESCbor) :) else id) $
             [ ("cbor", aesonBS txCbor)
             , ("testState", Aeson.String $ T.pack dir)
             , ("success", Aeson.Bool success)
-            , ("oldEpochState", aesonBS oldEs)
+            , ("oldNES", aesonBS oldNESCbor)
             ]
     Directory.createDirectoryIfMissing False "dump"
     Directory.createDirectoryIfMissing False ("dump/" ++ dir)
     ix <- fmap length (Directory.listDirectory ("dump/" ++ dir))
     BS.writeFile ("dump/" ++ dir ++ "/" ++ show ix) (BS.toStrict (Aeson.encode o))
     let
-      newGovState = newEpochState ^. esLStateL . lsUTxOStateL . utxosGovStateL
-      oldGovState = oldEpochState ^. esLStateL . lsUTxOStateL . utxosGovStateL
+      newGovState = newNES ^. nesEsL . esLStateL . lsUTxOStateL . utxosGovStateL
+      oldGovState = oldNES ^. nesEsL . esLStateL . lsUTxOStateL . utxosGovStateL
       getPParamsGovState govState = catMaybes
         [ Just (govState ^. curPParamsGovStateL)
         , Just (govState ^. prevPParamsGovStateL)
