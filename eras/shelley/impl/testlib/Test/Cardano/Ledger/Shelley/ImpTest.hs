@@ -144,15 +144,16 @@ import Cardano.Ledger.Address (
 import Cardano.Ledger.AuxiliaryData (AuxiliaryDataHash (..))
 import Cardano.Ledger.BHeaderView (BHeaderView)
 import Cardano.Ledger.BaseTypes
-import Cardano.Ledger.Binary (DecCBOR, EncCBOR)
+import Cardano.Ledger.Binary (DecCBOR, EncCBOR(encCBOR))
 import Cardano.Ledger.Binary.Encoding (serialize)
+import Cardano.Ledger.Binary.Coders (Encode(..), encode, (!>))
 import Cardano.Ledger.Block (Block)
 import Cardano.Ledger.CertState (dsUnifiedL)
 import Cardano.Ledger.Coin
 import Cardano.Ledger.Core
-import Cardano.Ledger.CertState (certDStateL, dsUnifiedL)
+import Cardano.Ledger.CertState (certDStateL)
 import Cardano.Ledger.Crypto (Crypto (..))
-import Cardano.Ledger.Credential (Credential (..), Ptr, StakeReference (..), credToText)
+import Cardano.Ledger.Credential (Credential (..), StakeReference (..), credToText)
 import Cardano.Ledger.Genesis (EraGenesis (..), NoGenesis (..))
 import Cardano.Ledger.Keys (
   HasKeyRole (..),
@@ -245,7 +246,6 @@ import Control.State.Transition.Extended (
   SingEP (..),
   ValidationPolicy (..),
  )
-import qualified Data.Aeson as Aeson
 import Data.Bifunctor (first)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Base16 as B16
@@ -292,7 +292,7 @@ import Test.Cardano.Ledger.Core.Rational ((%!))
 import Test.Cardano.Ledger.Core.Utils (mkDummySafeHash, txInAt)
 import Test.Cardano.Ledger.Imp.Common
 import Test.Cardano.Ledger.Plutus (PlutusArgs, ScriptTestContext)
-import Test.Cardano.Ledger.Shelley.TreeDiff (Expr (..))
+import Test.Cardano.Ledger.Shelley.TreeDiff (Expr(App))
 import Test.Cardano.Slotting.Numeric ()
 import Test.ImpSpec
 import Type.Reflection (Typeable, typeOf)
@@ -1077,6 +1077,23 @@ submitTx_ = void . submitTx
 submitTx :: (HasCallStack, ShelleyEraImp era) => Tx era -> ImpTestM era (Tx era)
 submitTx tx = trySubmitTx tx >>= expectRightDeepExpr . first fst
 
+data TestVector era = TestVector
+  { newNES :: Maybe (NewEpochState era)
+  , oldNES :: NewEpochState era
+  , transaction :: Tx era
+  , success :: Bool
+  , testState :: T.Text
+  }
+
+instance (Era era, EncCBOR (Tx era), EncCBOR (NewEpochState era)) => EncCBOR (TestVector era) where
+  encCBOR TestVector {newNES, oldNES, transaction, success, testState} =
+    encode $ Rec (TestVector @era)
+      !> To newNES
+      !> To oldNES
+      !> To transaction
+      !> To success
+      !> To testState
+
 trySubmitTx ::
   forall era.
   ( ShelleyEraImp era
@@ -1088,8 +1105,6 @@ trySubmitTx tx = do
   protVer <- getProtVer
   txFixed <- asks iteFixup >>= ($ tx)
   logToExpr txFixed
-  -- Log the tx post-fixup
-  let txCbor = B16.encode $ BS.toStrict $ (serialize (pvMajor protVer) txFixed)
   st <- gets impNES
   let oldNES = st
   lEnv <- impLedgerEnv st
@@ -1140,22 +1155,20 @@ trySubmitTx tx = do
     let sanitize = map $ \c -> if c == '/' then '-' else c
     let dir = sanitize $ intercalate "." testState
     let success = case res' of { Right _ -> True; Left _ -> False }
-    let cborHexLedgerState ls = B16.encode $ BS.toStrict $ (serialize (pvMajor protVer) ls)
-    let newNESCbor = cborHexLedgerState newNES
-    let oldNESCbor = cborHexLedgerState oldNES
-    let aesonBS = Aeson.String . Either.fromRight undefined . TE.decodeUtf8'
-    let o =
-          Aeson.object $
-            (if success then (("newNES" :: Aeson.Key, aesonBS newNESCbor) :) else id) $
-            [ ("cbor", aesonBS txCbor)
-            , ("testState", Aeson.String $ T.pack dir)
-            , ("success", Aeson.Bool success)
-            , ("oldNES", aesonBS oldNESCbor)
-            ]
+    let testVector =
+          TestVector
+            { newNES = if success then Just newNES else Nothing
+            , oldNES = oldNES
+            , success = success
+            , testState = T.pack dir
+            , transaction = txFixed
+            }
     Directory.createDirectoryIfMissing False "dump"
     Directory.createDirectoryIfMissing False ("dump/" ++ dir)
     ix <- fmap length (Directory.listDirectory ("dump/" ++ dir))
-    BS.writeFile ("dump/" ++ dir ++ "/" ++ show ix) (BS.toStrict (Aeson.encode o))
+    BS.writeFile
+      ("dump/" ++ dir ++ "/" ++ show ix)
+      (BS.toStrict $ (serialize (pvMajor protVer) testVector))
     let
       newGovState = newNES ^. nesEsL . esLStateL . lsUTxOStateL . utxosGovStateL
       oldGovState = oldNES ^. nesEsL . esLStateL . lsUTxOStateL . utxosGovStateL
