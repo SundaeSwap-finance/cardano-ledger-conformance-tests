@@ -1155,19 +1155,19 @@ trySubmitTx tx = do
     let success = case res' of { Right _ -> True; Left _ -> False }
     let txBytes = serialize (pvMajor protVer) txFixed
     testState <- readIORef globalTestState
-    modifyIORef thisTestTxes (++ [(MakeEncodedThing txBytes encCBOR, success)])
+    modifyIORef thisTestTxes (++ [(encCBOR txBytes, success)])
     globalStates' <- readIORef globalStates
     when (null globalStates') $
-      modifyIORef globalStates (++ [MakeEncodedThing oldNES encCBOR])
+      modifyIORef globalStates (++ [encCBOR oldNES])
     --modifyIORef globalStates (++ [serialize (pvMajor protVer) newNES])
-    modifyIORef globalStates (++ [MakeEncodedThing newNES encCBOR])
+    modifyIORef globalStates (++ [encCBOR newNES])
     let dumpTo = sanitize $ intercalate "." testState
     modifyIORef dumpAction $ const $ \states txes ts -> do
       Directory.createDirectoryIfMissing False "dump"
       BS.writeFile
         ("dump/" ++ dumpTo)
         (BS.toStrict $ (serialize (pvMajor protVer)
-          (states, txes, T.pack dumpTo)))
+          (head states, last states, txes, T.pack dumpTo)))
 
     --  liftIO $ putStrLn $
     --    "Would write "

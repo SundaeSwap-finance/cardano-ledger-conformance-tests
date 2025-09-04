@@ -79,7 +79,6 @@ module Test.Cardano.Ledger.Imp.Common (
   globalStates,
   thisTestTxes,
   dumpAction,
-  EncodedThing(MakeEncodedThing),
 )
 where
 
@@ -235,14 +234,7 @@ it s spec = do
     liftIO $ modifyIORef globalStates (const [])
     liftIO $ modifyIORef thisTestTxes (const [])
 
-data EncodedThing where
-  MakeEncodedThing :: a -> (a -> Encoding) -> EncodedThing
-
-instance EncCBOR EncodedThing where
-  encCBOR (MakeEncodedThing x encX) = encX x
-
-
-dumpAction :: IORef ([EncodedThing] -> [(EncodedThing, Bool)] -> [String] -> IO ())
+dumpAction :: IORef ([Encoding] -> [(Encoding, Bool)] -> [String] -> IO ())
 dumpAction = unsafePerformIO $ newIORef (\_ _ _ -> pure ())
 
 lastTestState :: IORef (Maybe [String])
@@ -251,8 +243,8 @@ lastTestState = unsafePerformIO $ newIORef Nothing
 globalTestState :: IORef [String]
 globalTestState = unsafePerformIO $ newIORef []
 
-globalStates :: IORef [EncodedThing]
+globalStates :: IORef [Encoding]
 globalStates = unsafePerformIO $ newIORef []
 
-thisTestTxes :: IORef [(EncodedThing, Bool)]
+thisTestTxes :: IORef [(Encoding, Bool)]
 thisTestTxes = unsafePerformIO $ newIORef []
