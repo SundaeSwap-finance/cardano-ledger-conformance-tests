@@ -298,7 +298,7 @@ import Test.ImpSpec
 import Type.Reflection (Typeable, typeOf)
 import UnliftIO (evaluateDeep)
 
-import Data.IORef (readIORef)
+import Data.IORef (modifyIORef, readIORef)
 
 type ImpTestM era = ImpM (LedgerSpec era)
 
@@ -1150,41 +1150,52 @@ trySubmitTx tx = do
   -- Log the ledger state
   st' <- gets impNES
   let newNES = st'
+  let sanitize = map $ \c -> if c == '/' then '-' else c
   liftIO $ do
-    testState <- readIORef globalTestState
-    let sanitize = map $ \c -> if c == '/' then '-' else c
-    let dir = sanitize $ intercalate "." testState
     let success = case res' of { Right _ -> True; Left _ -> False }
-    let testVector =
-          TestVector
-            { newNES = if success then Just newNES else Nothing
-            , oldNES = oldNES
-            , success = success
-            , testState = T.pack dir
-            , transaction = txFixed
-            }
-    Directory.createDirectoryIfMissing False "dump"
-    Directory.createDirectoryIfMissing False ("dump/" ++ dir)
-    ix <- fmap length (Directory.listDirectory ("dump/" ++ dir))
-    BS.writeFile
-      ("dump/" ++ dir ++ "/" ++ show ix)
-      (BS.toStrict $ (serialize (pvMajor protVer) testVector))
-    let
-      newGovState = newNES ^. nesEsL . esLStateL . lsUTxOStateL . utxosGovStateL
-      oldGovState = oldNES ^. nesEsL . esLStateL . lsUTxOStateL . utxosGovStateL
-      getPParamsGovState govState = catMaybes
-        [ Just (govState ^. curPParamsGovStateL)
-        , Just (govState ^. prevPParamsGovStateL)
-        ]
-      allPParams = getPParamsGovState newGovState ++ getPParamsGovState oldGovState
-    Directory.createDirectoryIfMissing False "dump/pparams-by-hash"
-    traverse_
-      (\pparams -> do
-        let hash = hashPParams pparams (pvMajor protVer)
-        BS.writeFile
-          ("dump/pparams-by-hash/" ++ T.unpack (Either.fromRight undefined (TE.decodeUtf8' (B16.encode hash))))
-          (BS.toStrict (serialize (pvMajor protVer) (encodePParamsPreimage pparams))))
-      allPParams
+    let txBytes = serialize (pvMajor protVer) txFixed
+    testState <- readIORef globalTestState
+    modifyIORef thisTestTxes (++ [(MakeEncodedThing txBytes encCBOR, success)])
+    globalStates' <- readIORef globalStates
+    when (null globalStates') $
+      modifyIORef globalStates (++ [MakeEncodedThing oldNES encCBOR])
+    --modifyIORef globalStates (++ [serialize (pvMajor protVer) newNES])
+    modifyIORef globalStates (++ [MakeEncodedThing newNES encCBOR])
+    let dumpTo = sanitize $ intercalate "." testState
+    modifyIORef dumpAction $ const $ \states txes ts -> do
+      Directory.createDirectoryIfMissing False "dump"
+      BS.writeFile
+        ("dump/" ++ dumpTo)
+        (BS.toStrict $ (serialize (pvMajor protVer)
+          (states, txes, T.pack dumpTo)))
+
+    --  liftIO $ putStrLn $
+    --    "Would write "
+    --    ++ show (length txes)
+    --    ++ " transactions for test "
+    --    ++ Data.List.intercalate "." ts
+    --Directory.createDirectoryIfMissing False "dump"
+    --Directory.createDirectoryIfMissing False ("dump/" ++ dir)
+    --ix <- fmap length (Directory.listDirectory ("dump/" ++ dir))
+    --BS.writeFile
+    --  ("dump/" ++ dir ++ "/" ++ show ix)
+    --  (BS.toStrict $ (serialize (pvMajor protVer) testVector))
+    --let
+    --  newGovState = newNES ^. nesEsL . esLStateL . lsUTxOStateL . utxosGovStateL
+    --  oldGovState = oldNES ^. nesEsL . esLStateL . lsUTxOStateL . utxosGovStateL
+    --  getPParamsGovState govState = catMaybes
+    --    [ Just (govState ^. curPParamsGovStateL)
+    --    , Just (govState ^. prevPParamsGovStateL)
+    --    ]
+    --  allPParams = getPParamsGovState newGovState ++ getPParamsGovState oldGovState
+    --Directory.createDirectoryIfMissing False "dump/pparams-by-hash"
+    --traverse_
+    --  (\pparams -> do
+    --    let hash = hashPParams pparams (pvMajor protVer)
+    --    BS.writeFile
+    --      ("dump/pparams-by-hash/" ++ T.unpack (Either.fromRight undefined (TE.decodeUtf8' (B16.encode hash))))
+    --      (BS.toStrict (serialize (pvMajor protVer) (encodePParamsPreimage pparams))))
+    --  allPParams
     pure res'
 
 -- | Submit a transaction that is expected to be rejected with the given predicate failures.

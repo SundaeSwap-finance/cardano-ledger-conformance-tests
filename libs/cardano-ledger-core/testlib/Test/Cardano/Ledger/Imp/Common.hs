@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
@@ -73,13 +74,20 @@ module Test.Cardano.Ledger.Imp.Common (
 
   describe,
   it,
+  lastTestState,
   globalTestState,
+  globalStates,
+  thisTestTxes,
+  dumpAction,
+  EncodedThing(MakeEncodedThing),
 )
 where
 
 import Control.Monad.IO.Class
-import Data.List (isInfixOf)
+import Data.ByteString.Lazy (ByteString)
+import Data.List (intercalate, isInfixOf)
 import qualified System.Random.Stateful as R
+import Cardano.Ledger.Binary.Encoding (EncCBOR(..), Encoding)
 import Test.Cardano.Ledger.Binary.TreeDiff (expectExprEqualWithMessage)
 import Test.Cardano.Ledger.Common as X hiding (
   arbitrary,
@@ -216,9 +224,35 @@ it :: (Example a, MonadIO m, m () ~ a) => String -> a -> SpecWith (Arg a)
 it s spec = do
   p <- getSpecDescriptionPath
   Common.it s $ do
-    liftIO $ modifyIORef globalTestState (const (p ++ [s]))
+    let ts = p ++ [s]
+    liftIO $ modifyIORef globalTestState (const ts)
     spec
+    txes <- liftIO $ readIORef thisTestTxes
+    doDump <- liftIO $ readIORef dumpAction
+    states <- liftIO $ readIORef globalStates
+    liftIO $ doDump states txes ts
     liftIO $ modifyIORef globalTestState (const [])
+    liftIO $ modifyIORef globalStates (const [])
+    liftIO $ modifyIORef thisTestTxes (const [])
+
+data EncodedThing where
+  MakeEncodedThing :: a -> (a -> Encoding) -> EncodedThing
+
+instance EncCBOR EncodedThing where
+  encCBOR (MakeEncodedThing x encX) = encX x
+
+
+dumpAction :: IORef ([EncodedThing] -> [(EncodedThing, Bool)] -> [String] -> IO ())
+dumpAction = unsafePerformIO $ newIORef (\_ _ _ -> pure ())
+
+lastTestState :: IORef (Maybe [String])
+lastTestState = unsafePerformIO $ newIORef Nothing
 
 globalTestState :: IORef [String]
 globalTestState = unsafePerformIO $ newIORef []
+
+globalStates :: IORef [EncodedThing]
+globalStates = unsafePerformIO $ newIORef []
+
+thisTestTxes :: IORef [(EncodedThing, Bool)]
+thisTestTxes = unsafePerformIO $ newIORef []

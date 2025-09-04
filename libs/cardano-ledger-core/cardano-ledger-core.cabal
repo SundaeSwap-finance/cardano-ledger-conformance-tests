@@ -198,6 +198,7 @@ library testlib
         quickcheck-transformer,
         plutus-ledger-api:{plutus-ledger-api, plutus-ledger-api-testlib},
         random >=1.2,
+        serialise,
         text,
         tree-diff,
         vector-map:{vector-map, testlib},
