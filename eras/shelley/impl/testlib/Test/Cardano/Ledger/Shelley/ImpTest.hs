@@ -145,7 +145,7 @@ import Cardano.Ledger.AuxiliaryData (AuxiliaryDataHash (..))
 import Cardano.Ledger.BHeaderView (BHeaderView)
 import Cardano.Ledger.BaseTypes
 import Cardano.Ledger.Binary (DecCBOR, EncCBOR(encCBOR))
-import Cardano.Ledger.Binary.Encoding (serialize)
+import Cardano.Ledger.Binary.Encoding (Encoding, serialize)
 import Cardano.Ledger.Binary.Coders (Encode(..), encode, (!>))
 import Cardano.Ledger.Block (Block)
 import Cardano.Ledger.CertState (dsUnifiedL)
@@ -294,11 +294,19 @@ import Test.Cardano.Ledger.Imp.Common
 import Test.Cardano.Ledger.Plutus (PlutusArgs, ScriptTestContext)
 import Test.Cardano.Ledger.Shelley.TreeDiff (Expr(App))
 import Test.Cardano.Slotting.Numeric ()
-import Test.ImpSpec
+import Test.ImpSpec hiding (impAnn, impAnnDoc)
+import qualified Test.ImpSpec as ImpSpec
 import Type.Reflection (Typeable, typeOf)
 import UnliftIO (evaluateDeep)
 
 import Data.IORef (modifyIORef, readIORef)
+
+impAnn s a = do
+  liftIO $ modifyIORef annotations $ const [s]
+  ImpSpec.impAnn s a
+
+impAnnDoc s a = do
+  ImpSpec.impAnnDoc s a
 
 type ImpTestM era = ImpM (LedgerSpec era)
 
@@ -1152,6 +1160,7 @@ trySubmitTx tx = do
   let newNES = st'
   let sanitize = map $ \c -> if c == '/' then '-' else c
   liftIO $ do
+    modifyIORef dumpProtocolVersion $ const (pvMajor protVer)
     let success = case res' of { Right _ -> True; Left _ -> False }
     let txBytes = serialize (pvMajor protVer) txFixed
     testState <- readIORef globalTestState
@@ -1159,43 +1168,25 @@ trySubmitTx tx = do
     globalStates' <- readIORef globalStates
     when (null globalStates') $
       modifyIORef globalStates (++ [encCBOR oldNES])
-    --modifyIORef globalStates (++ [serialize (pvMajor protVer) newNES])
     modifyIORef globalStates (++ [encCBOR newNES])
     let dumpTo = sanitize $ intercalate "." testState
-    modifyIORef dumpAction $ const $ \states txes ts -> do
-      Directory.createDirectoryIfMissing False "dump"
-      BS.writeFile
-        ("dump/" ++ dumpTo)
-        (BS.toStrict $ (serialize (pvMajor protVer)
-          (head states, last states, txes, T.pack dumpTo)))
-
-    --  liftIO $ putStrLn $
-    --    "Would write "
-    --    ++ show (length txes)
-    --    ++ " transactions for test "
-    --    ++ Data.List.intercalate "." ts
-    --Directory.createDirectoryIfMissing False "dump"
-    --Directory.createDirectoryIfMissing False ("dump/" ++ dir)
-    --ix <- fmap length (Directory.listDirectory ("dump/" ++ dir))
-    --BS.writeFile
-    --  ("dump/" ++ dir ++ "/" ++ show ix)
-    --  (BS.toStrict $ (serialize (pvMajor protVer) testVector))
-    --let
-    --  newGovState = newNES ^. nesEsL . esLStateL . lsUTxOStateL . utxosGovStateL
-    --  oldGovState = oldNES ^. nesEsL . esLStateL . lsUTxOStateL . utxosGovStateL
-    --  getPParamsGovState govState = catMaybes
-    --    [ Just (govState ^. curPParamsGovStateL)
-    --    , Just (govState ^. prevPParamsGovStateL)
-    --    ]
-    --  allPParams = getPParamsGovState newGovState ++ getPParamsGovState oldGovState
-    --Directory.createDirectoryIfMissing False "dump/pparams-by-hash"
-    --traverse_
-    --  (\pparams -> do
-    --    let hash = hashPParams pparams (pvMajor protVer)
-    --    BS.writeFile
-    --      ("dump/pparams-by-hash/" ++ T.unpack (Either.fromRight undefined (TE.decodeUtf8' (B16.encode hash))))
-    --      (BS.toStrict (serialize (pvMajor protVer) (encodePParamsPreimage pparams))))
-    --  allPParams
+    let
+      newGovState = newNES ^. nesEsL . esLStateL . lsUTxOStateL . utxosGovStateL
+      oldGovState = oldNES ^. nesEsL . esLStateL . lsUTxOStateL . utxosGovStateL
+      getPParamsGovState govState = catMaybes
+        [ Just (govState ^. curPParamsGovStateL)
+        , Just (govState ^. prevPParamsGovStateL)
+        ]
+      allPParams = getPParamsGovState newGovState ++ getPParamsGovState oldGovState
+    Directory.createDirectoryIfMissing False "dump"
+    Directory.createDirectoryIfMissing False "dump/pparams-by-hash"
+    traverse_
+      (\pparams -> do
+        let hash = hashPParams pparams (pvMajor protVer)
+        BS.writeFile
+          ("dump/pparams-by-hash/" ++ T.unpack (Either.fromRight undefined (TE.decodeUtf8' (B16.encode hash))))
+          (BS.toStrict (serialize (pvMajor protVer) (encodePParamsPreimage pparams))))
+      allPParams
     pure res'
 
 -- | Submit a transaction that is expected to be rejected with the given predicate failures.

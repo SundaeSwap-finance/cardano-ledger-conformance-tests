@@ -163,6 +163,7 @@ library testlib
         cardano-strict-containers,
         containers,
         cuddle >=0.3.2,
+        directory,
         FailT,
         generic-random,
         hedgehog-quickcheck,

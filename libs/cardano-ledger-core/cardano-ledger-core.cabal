@@ -182,6 +182,7 @@ library testlib
         cuddle,
         data-default,
         deepseq,
+        directory,
         FailT,
         generic-random,
         genvalidity,

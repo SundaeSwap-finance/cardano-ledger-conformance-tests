@@ -78,16 +78,19 @@ module Test.Cardano.Ledger.Imp.Common (
   globalTestState,
   globalStates,
   thisTestTxes,
-  dumpAction,
+  annotations,
+  dumpProtocolVersion,
 )
 where
 
 import Control.Monad.IO.Class
 import Data.ByteString.Lazy (ByteString)
 import Data.List (intercalate, isInfixOf)
+import Data.Word (Word16)
 import qualified System.Random.Stateful as R
-import Cardano.Ledger.Binary.Encoding (EncCBOR(..), Encoding)
+import Cardano.Ledger.Binary.Encoding (EncCBOR(..), Encoding, serialize)
 import Test.Cardano.Ledger.Binary.TreeDiff (expectExprEqualWithMessage)
+import Cardano.Ledger.Binary.Version (Version, mkVersion)
 import Test.Cardano.Ledger.Common as X hiding (
   arbitrary,
   assertBool,
@@ -140,6 +143,7 @@ import Test.Cardano.Ledger.Common as X hiding (
 import qualified Test.Cardano.Ledger.Common as Common
 import Test.Cardano.Ledger.Core.KeyPair (KeyPair (..), mkAddr)
 import Test.ImpSpec (modifyImpInit, withImpInit)
+import qualified Test.ImpSpec as ImpSpec
 import Test.ImpSpec.Expectations.Lifted
 import Test.ImpSpec.Random (
   HasStatefulGen (..),
@@ -157,6 +161,10 @@ import UnliftIO.Exception (evaluateDeep)
 import System.IO.Unsafe (unsafePerformIO)
 import Data.IORef (IORef, newIORef, modifyIORef, readIORef)
 import Test.Hspec.Core.Spec as X (getSpecDescriptionPath)
+
+import qualified Data.ByteString as BS
+import qualified Data.Text as T
+import qualified System.Directory as Directory
 
 instance MonadUnliftIO m => MonadUnliftIO (GenT m) where
   withRunInIO inner = GenT $ \qc sz ->
@@ -227,15 +235,26 @@ it s spec = do
     liftIO $ modifyIORef globalTestState (const ts)
     spec
     txes <- liftIO $ readIORef thisTestTxes
-    doDump <- liftIO $ readIORef dumpAction
     states <- liftIO $ readIORef globalStates
-    liftIO $ doDump states txes ts
+    notes <- liftIO $ readIORef annotations
+    protocolVersion <- liftIO $ readIORef dumpProtocolVersion
+    let doDump = do
+          let sanitize = map $ \c -> if c == '/' then '-' else c
+          let dumpTo = sanitize $ intercalate "." ts
+          Directory.createDirectoryIfMissing False "dump"
+          BS.writeFile
+            ("dump/" ++ dumpTo)
+            (BS.toStrict $ (serialize protocolVersion
+              ( if null states then encCBOR ([] :: [()]) else head states
+              , if null states then encCBOR ([] :: [()]) else last states
+              , txes
+              , T.pack dumpTo
+              )))
+    liftIO $ doDump
     liftIO $ modifyIORef globalTestState (const [])
     liftIO $ modifyIORef globalStates (const [])
     liftIO $ modifyIORef thisTestTxes (const [])
-
-dumpAction :: IORef ([Encoding] -> [(Encoding, Bool)] -> [String] -> IO ())
-dumpAction = unsafePerformIO $ newIORef (\_ _ _ -> pure ())
+    liftIO $ modifyIORef annotations (const [])
 
 lastTestState :: IORef (Maybe [String])
 lastTestState = unsafePerformIO $ newIORef Nothing
@@ -248,3 +267,9 @@ globalStates = unsafePerformIO $ newIORef []
 
 thisTestTxes :: IORef [(Encoding, Bool)]
 thisTestTxes = unsafePerformIO $ newIORef []
+
+annotations :: IORef [String]
+annotations = unsafePerformIO $ newIORef []
+
+dumpProtocolVersion :: IORef Version
+dumpProtocolVersion = unsafePerformIO $ newIORef minBound
