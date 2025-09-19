@@ -83,6 +83,7 @@ module Test.Cardano.Ledger.Imp.Common (
 )
 where
 
+import Cardano.Slotting.Slot (SlotNo (..))
 import Control.Monad.IO.Class
 import Data.ByteString.Lazy (ByteString)
 import Data.List (intercalate, isInfixOf)
@@ -265,7 +266,7 @@ globalTestState = unsafePerformIO $ newIORef []
 globalStates :: IORef [Encoding]
 globalStates = unsafePerformIO $ newIORef []
 
-thisTestTxes :: IORef [(Encoding, Bool)]
+thisTestTxes :: IORef [(Encoding, Bool, SlotNo)]
 thisTestTxes = unsafePerformIO $ newIORef []
 
 annotations :: IORef [String]

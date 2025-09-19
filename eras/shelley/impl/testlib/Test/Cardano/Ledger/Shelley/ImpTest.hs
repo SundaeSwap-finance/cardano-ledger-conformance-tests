@@ -1111,6 +1111,7 @@ trySubmitTx ::
   ImpTestM era (Either (NonEmpty (PredicateFailure (EraRule "LEDGER" era)), Tx era) (Tx era))
 trySubmitTx tx = do
   protVer <- getProtVer
+  currentSlotNo <- gets impLastTick
   txFixed <- asks iteFixup >>= ($ tx)
   logToExpr txFixed
   st <- gets impNES
@@ -1164,7 +1165,7 @@ trySubmitTx tx = do
     let success = case res' of { Right _ -> True; Left _ -> False }
     let txBytes = serialize (pvMajor protVer) txFixed
     testState <- readIORef globalTestState
-    modifyIORef thisTestTxes (++ [(encCBOR txBytes, success)])
+    modifyIORef thisTestTxes (++ [(encCBOR txBytes, success, currentSlotNo)])
     globalStates' <- readIORef globalStates
     when (null globalStates') $
       modifyIORef globalStates (++ [encCBOR oldNES])
