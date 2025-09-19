@@ -241,15 +241,16 @@ it s spec = do
     protocolVersion <- liftIO $ readIORef dumpProtocolVersion
     let doDump = do
           let sanitize = map $ \c -> if c == '/' then '-' else c
-          let dumpTo = sanitize $ intercalate "." ts
-          Directory.createDirectoryIfMissing False "dump"
+          let dirPath = intercalate "/" $ map sanitize (init ts)
+          let file = sanitize (last ts)
+          Directory.createDirectoryIfMissing True ("dump/" ++ dirPath)
           BS.writeFile
-            ("dump/" ++ dumpTo)
+            ("dump/" ++ dirPath ++ "/" ++ file)
             (BS.toStrict $ (serialize protocolVersion
               ( if null states then encCBOR ([] :: [()]) else head states
               , if null states then encCBOR ([] :: [()]) else last states
               , txes
-              , T.pack dumpTo
+              , T.pack (dirPath ++ "/" ++ file)
               )))
     liftIO $ doDump
     liftIO $ modifyIORef globalTestState (const [])
