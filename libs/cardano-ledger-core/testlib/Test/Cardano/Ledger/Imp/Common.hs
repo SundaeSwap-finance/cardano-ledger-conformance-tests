@@ -252,7 +252,9 @@ it s spec = do
               , txes
               , T.pack (dirPath ++ "/" ++ file)
               )))
-    liftIO $ doDump
+    when
+      (not (null txes))
+      (liftIO doDump)
     liftIO $ modifyIORef globalTestState (const [])
     liftIO $ modifyIORef globalStates (const [])
     liftIO $ modifyIORef thisTestTxes (const [])
